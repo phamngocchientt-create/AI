@@ -5,7 +5,7 @@ import os
 
 # ==================================================
 # 👇 MÃ FILE CỦA BẠN (Tôi đã điền sẵn)
-MY_FILE_NAME = "files/501jm98gmcjc"
+MY_FILE_NAME = "files/0knsf88wkf4o"
 # ==================================================
 
 st.set_page_config(page_title="Gia sư Hóa học THCS", layout="wide")
@@ -94,3 +94,4 @@ if prompt := st.chat_input("Nhập câu hỏi Hóa học..."):
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
                 st.error(f"Có lỗi xảy ra: {e}")
+

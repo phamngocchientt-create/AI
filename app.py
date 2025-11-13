@@ -4,7 +4,7 @@ from google.genai import types
 import os
 
 # ==================================================
-# 👇 TÔI ĐÃ ĐIỀN SẴN MÃ FILE CỦA BẠN VÀO ĐÂY RỒI
+# 👇 MÃ FILE CỦA BẠN (Đã điền sẵn)
 MY_FILE_NAME = "files/501jm98gmcjc"
 # ==================================================
 
@@ -15,7 +15,7 @@ st.title("👨‍🔬 Gia sư Hóa học THCS")
 with st.sidebar:
     st.success("✅ Kết nối thành công!")
     st.info(f"📚 Tài liệu: `{MY_FILE_NAME}`")
-    st.info("🤖 Model: gemini-1.5-flash-001")
+    st.info("🤖 Model: gemini-1.5-flash (Auto)")
 
 @st.cache_resource
 def setup_chat_session():
@@ -31,13 +31,15 @@ def setup_chat_session():
     sys_instruct = (
         "Bạn là Gia sư Hóa học THCS (Lớp 8-9). "
         "Hãy trả lời câu hỏi của học sinh dựa trên tài liệu đính kèm. "
-        "Giải thích dễ hiểu, ngắn gọn và chính xác."
+        "Giải thích dễ hiểu, ngắn gọn và chính xác. "
+        "Nếu thông tin không có trong tài liệu, hãy nói rõ."
     )
 
     try:
-        # Tạo phiên chat với Model ổn định nhất
+        # Tạo phiên chat
+        # 👇 ĐÃ SỬA: Dùng tên model chung để tránh lỗi 404
         chat = client.chats.create(
-            model="gemini-1.5-flash-001", 
+            model="gemini-1.5-flash", 
             config=types.GenerateContentConfig(
                 system_instruction=sys_instruct,
                 temperature=0.5 # Giữ cho câu trả lời bám sát tài liệu
@@ -54,7 +56,7 @@ def setup_chat_session():
                 ),
                 types.Content(
                     role="model",
-                    parts=[types.Part.from_text(text="Đã rõ. Tôi đã sẵn sàng dạy Hóa học.")]
+                    parts=[types.Part.from_text(text="Đã rõ. Tôi đã đọc tài liệu và sẵn sàng dạy Hóa học.")]
                 )
             ]
         )

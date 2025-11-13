@@ -3,40 +3,44 @@ from google import genai
 from google.genai import types
 import os
 
-# ==========================================
-# 👇 DÁN MÃ FILE CỦA BẠN VÀO ĐÂY (Giữ nguyên mã cũ của bạn)
-MY_FILE_NAME = "files/xxxxxxxxxxxxx" 
-# ==========================================
+# ==================================================
+# 👇 TÔI ĐÃ ĐIỀN SẴN MÃ FILE CỦA BẠN VÀO ĐÂY RỒI
+MY_FILE_NAME = "files/501jm98gmcjc"
+# ==================================================
 
 st.set_page_config(page_title="Gia sư Hóa học THCS", layout="wide")
 st.title("👨‍🔬 Gia sư Hóa học THCS")
 
-# Sidebar
+# Sidebar hiển thị thông tin
 with st.sidebar:
-    st.info(f"📚 Tài liệu đang dùng: `{MY_FILE_NAME}`")
-    st.success("Đang chạy mô hình: Gemini 1.5 Flash-002")
+    st.success("✅ Kết nối thành công!")
+    st.info(f"📚 Tài liệu: `{MY_FILE_NAME}`")
+    st.info("🤖 Model: gemini-1.5-flash-001")
 
 @st.cache_resource
 def setup_chat_session():
+    # Lấy API Key từ biến môi trường (Streamlit Secrets)
     api_key = os.getenv("GEMINI_API_KEY") 
     if not api_key:
-        st.error("⚠️ Chưa thiết lập GEMINI_API_KEY.")
+        st.error("⚠️ LỖI: Chưa thiết lập GEMINI_API_KEY.")
         return None, None
         
     client = genai.Client(api_key=api_key)
     
+    # Hướng dẫn cho AI
     sys_instruct = (
-        "Bạn là Gia sư Hóa học THCS. Trả lời dựa trên tài liệu đính kèm. "
-        "Nếu không có thông tin trong tài liệu, hãy nói rõ."
+        "Bạn là Gia sư Hóa học THCS (Lớp 8-9). "
+        "Hãy trả lời câu hỏi của học sinh dựa trên tài liệu đính kèm. "
+        "Giải thích dễ hiểu, ngắn gọn và chính xác."
     )
 
     try:
+        # Tạo phiên chat với Model ổn định nhất
         chat = client.chats.create(
-            # 👇 SỬA THÀNH TÊN PHIÊN BẢN CỤ THỂ (CÓ SỐ 002)
-            model="gemini-1.5-flash-002", 
+            model="gemini-1.5-flash-001", 
             config=types.GenerateContentConfig(
                 system_instruction=sys_instruct,
-                temperature=0.5
+                temperature=0.5 # Giữ cho câu trả lời bám sát tài liệu
             ),
             history=[
                 types.Content(
@@ -45,41 +49,47 @@ def setup_chat_session():
                         types.Part.from_uri(
                             file_uri=f"https://generativelanguage.googleapis.com/v1beta/{MY_FILE_NAME}",
                             mime_type="text/plain"),
-                        types.Part.from_text(text="Hãy học thuộc tài liệu này để dạy học sinh.")
+                        types.Part.from_text(text="Đây là giáo trình Hóa học. Hãy học thuộc nó để dạy học sinh.")
                     ]
                 ),
                 types.Content(
                     role="model",
-                    parts=[types.Part.from_text(text="Đã rõ. Tôi đã sẵn sàng.")]
+                    parts=[types.Part.from_text(text="Đã rõ. Tôi đã sẵn sàng dạy Hóa học.")]
                 )
             ]
         )
         return client, chat
     except Exception as e:
-        st.error(f"Lỗi kết nối: {e}")
+        st.error(f"❌ Lỗi kết nối Gemini: {e}")
         return None, None
 
+# Khởi tạo
 client, chat_session = setup_chat_session()
 
+# Quản lý lịch sử chat
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Chào em! Thầy là Gia sư Hóa học. Em có câu hỏi gì không?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Chào em! Thầy là Gia sư Hóa học. Em muốn hỏi về bài nào?"}]
 
+# Hiển thị tin nhắn
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("Nhập câu hỏi..."):
+# Xử lý khi người dùng nhập câu hỏi
+if prompt := st.chat_input("Nhập câu hỏi Hóa học..."):
     if not client: st.stop()
     
+    # Hiện câu hỏi
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # AI trả lời
     with st.chat_message("assistant"):
-        with st.spinner("Thầy đang xem lại tài liệu..."):
+        with st.spinner("Thầy đang xem tài liệu..."):
             try:
                 response = chat_session.send_message(prompt)
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                st.error(f"Lỗi: {e}")
+                st.error(f"Có lỗi xảy ra: {e}")

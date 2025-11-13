@@ -41,7 +41,7 @@ def setup_chat_session():
     # 2. Tạo phiên chat và đính kèm file vào lịch sử
     try:
         chat = client.chats.create(
-            model="gemini-2.0-flash-exp",  # Dùng bản Flash mới nhất
+            model="gemini-1.5-flash",
             config=types.GenerateContentConfig(
                 system_instruction=sys_instruct,
                 temperature=0.5  # Giảm sáng tạo để bám sát tài liệu
@@ -101,4 +101,5 @@ if prompt := st.chat_input("Nhập câu hỏi Hóa học của bạn..."):
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
+
                 st.error(f"Có lỗi xảy ra: {e}")

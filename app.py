@@ -4,7 +4,7 @@ from google.genai import types
 import os
 
 # ==================================================
-# 👇 MÃ FILE CỦA BẠN (Đã điền sẵn)
+# 👇 MÃ FILE CỦA BẠN (Tôi đã điền sẵn)
 MY_FILE_NAME = "files/501jm98gmcjc"
 # ==================================================
 
@@ -15,11 +15,12 @@ st.title("👨‍🔬 Gia sư Hóa học THCS")
 with st.sidebar:
     st.success("✅ Kết nối thành công!")
     st.info(f"📚 Tài liệu: `{MY_FILE_NAME}`")
-    st.info("🤖 Model: gemini-1.5-flash (Auto)")
+    # Sử dụng model chính thức từ danh sách của bạn
+    st.info("🤖 Model: gemini-2.0-flash")
 
 @st.cache_resource
 def setup_chat_session():
-    # Lấy API Key từ biến môi trường (Streamlit Secrets)
+    # Lấy API Key từ biến môi trường
     api_key = os.getenv("GEMINI_API_KEY") 
     if not api_key:
         st.error("⚠️ LỖI: Chưa thiết lập GEMINI_API_KEY.")
@@ -29,20 +30,18 @@ def setup_chat_session():
     
     # Hướng dẫn cho AI
     sys_instruct = (
-        "Bạn là Gia sư Hóa học THCS (Lớp 8-9). "
-        "Hãy trả lời câu hỏi của học sinh dựa trên tài liệu đính kèm. "
-        "Giải thích dễ hiểu, ngắn gọn và chính xác. "
-        "Nếu thông tin không có trong tài liệu, hãy nói rõ."
+        "Bạn là Gia sư Hóa học THCS (Lớp 8-9) thân thiện. "
+        "Nhiệm vụ: Trả lời câu hỏi của học sinh CHÍNH XÁC dựa trên tài liệu đính kèm. "
+        "Nếu tài liệu không có thông tin, hãy nói rõ rằng bạn không tìm thấy trong giáo trình."
     )
 
     try:
-        # Tạo phiên chat
-        # 👇 ĐÃ SỬA: Dùng tên model chung để tránh lỗi 404
+        # 👇 ĐÃ CHỌN MODEL TỐT NHẤT TRONG DANH SÁCH CỦA BẠN
         chat = client.chats.create(
-            model="gemini-1.5-flash", 
+            model="gemini-2.0-flash", 
             config=types.GenerateContentConfig(
                 system_instruction=sys_instruct,
-                temperature=0.5 # Giữ cho câu trả lời bám sát tài liệu
+                temperature=0.5 # Giữ câu trả lời ổn định
             ),
             history=[
                 types.Content(
@@ -88,7 +87,7 @@ if prompt := st.chat_input("Nhập câu hỏi Hóa học..."):
 
     # AI trả lời
     with st.chat_message("assistant"):
-        with st.spinner("Thầy đang xem tài liệu..."):
+        with st.spinner("Thầy đang suy nghĩ..."):
             try:
                 response = chat_session.send_message(prompt)
                 st.markdown(response.text)

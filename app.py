@@ -80,12 +80,10 @@ def get_files_from_drive(_service):
         st.error(f"Lỗi khi lấy danh sách file Drive: {e}")
         return []
 
-# HÀM NÀY PHẢI TRẢ VỀ CẢ CLIENT VÀ CHAT SESSION
 @st.cache_resource
 def setup_chat_session(_creds, _drive_files):
-    """Khởi tạo Gemini client bằng credentials của Robot."""
+    """Khởi tạo Gemini client và chat session."""
     try:
-        # Client không dùng API Key
         client = genai.Client(credentials=_creds)
         
         sys_instruct = (
@@ -106,6 +104,7 @@ def setup_chat_session(_creds, _drive_files):
 
         list_parts = []
         for f in _drive_files:
+            # ĐƯỜNG LINK CHUẨN CỦA GOOGLE DRIVE API
             uri = f"https://www.googleapis.com/drive/v3/files/{f['id']}?alt=media" 
             list_parts.append(types.Part.from_uri(file_uri=uri, mime_type=f['mimeType'])) 
         
@@ -134,10 +133,10 @@ def setup_chat_session(_creds, _drive_files):
 st.set_page_config(page_title="Gia sư Hóa học (Drive)", layout="wide")
 st.title("👨‍🔬 Gia sư Hóa học THCS (Nguồn: Google Drive)")
 
-# ⚠️ KHỞI TẠO BIẾN TRƯỚC ⚠️
+# LOGIC KHỞI TẠO ĐÃ ĐƯỢC SỬA LỖI TUPL
 credentials = get_credentials()
-client = None # Cần khởi tạo client
-chat_session = None # Khởi tạo chat_session
+client = None
+chat_session = None
 
 if credentials:
     drive_service = get_google_drive_service(credentials)
@@ -150,11 +149,12 @@ if credentials:
                     for f in drive_files:
                         st.code(f"{f['name']} ({f['mimeType']})")
             
-            # ⚠️ SỬA LỖI: BÓC TÁCH TUPLE CHÍNH XÁC ⚠️
+            # ⚠️ SỬA LỖI TUPLE: BÓC TÁCH VÀ GÁN GIÁ TRỊ ⚠️
             result = setup_chat_session(credentials, drive_files)
-            if result and isinstance(result, tuple):
-                client, chat_session = result # Lấy client và chat_session ra từ tuple
-
+            if result and isinstance(result, tuple) and result[1]:
+                client, chat_session = result # Gán giá trị chính xác
+            else:
+                st.error("Lỗi: Không thể tạo phiên trò chuyện. Kiểm tra lỗi thiết lập Gemini.")
         else:
             st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")
     else:
@@ -186,4 +186,3 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
-

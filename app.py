@@ -46,7 +46,6 @@ def get_google_drive_service():
         st.error(f"Lỗi xác thực Google Drive: {e}")
         return None
 
-# ⚠️ HÀM NÀY ĐÃ ĐƯỢC SỬA ⚠️
 @st.cache_data(ttl=600) # Cache trong 10 phút
 def get_files_from_drive(_service):
     """Lấy danh sách file ID VÀ mimeType từ thư mục Google Drive."""
@@ -61,16 +60,13 @@ def get_files_from_drive(_service):
             
         file_list = []
         for f in files:
-            # Chỉ lấy các file mà Gemini hỗ trợ đọc
             if "pdf" in f["mimeType"] or "text" in f["mimeType"]:
-                # LƯU LẠI CẢ mimeType
                 file_list.append({"id": f["id"], "name": f["name"], "mimeType": f["mimeType"]})
         return file_list
     except Exception as e:
         st.error(f"Lỗi khi lấy danh sách file Drive: {e}")
         return []
 
-# ⚠️ HÀM NÀY ĐÃ ĐƯỢC SỬA ⚠️
 @st.cache_resource
 def setup_chat_session(_drive_files):
     """Khởi tạo Gemini client và phiên chat với các file từ Drive."""
@@ -96,8 +92,8 @@ def setup_chat_session(_drive_files):
 
         list_parts = []
         for f in _drive_files:
-            uri = f"https://generativelace.googleapis.com/v1beta/files/{f['id']}"
-            # SỬA LỖI: Dùng đúng mimeType (ví dụ: 'text/plain')
+            # ⚠️ SỬA LỖI TAI HẠI: "generativelace" -> "generativelanguage" ⚠️
+            uri = f"https://generativelanguage.googleapis.com/v1beta/files/{f['id']}"
             list_parts.append(types.Part.from_uri(file_uri=uri, mime_type=f['mimeType'])) 
         
         list_parts.append(types.Part.from_text(text="Hãy tuân thủ 2 quy trình sư phạm trên."))
@@ -134,7 +130,7 @@ if drive_service:
             st.info(f"🤖 Model: {MODEL_NAME}")
             with st.expander(f"Thấy {len(drive_files)} tài liệu (Refresh sau 10p)"):
                 for f in drive_files:
-                    st.code(f"{f['name']} ({f['mimeType']})") # Hiển thị cả loại file
+                    st.code(f"{f['name']} ({f['mimeType']})")
         client, chat_session = setup_chat_session(drive_files)
     else:
         st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")

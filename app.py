@@ -5,7 +5,7 @@ import os
 
 # ----------------------------------------------------
 # ⚠️ BƯỚC 1: DÁN DANH SÁCH MÃ FILE TẠM THỜI VÀO ĐÂY ⚠️
-# DÁN LIST_FILES TỪ SCRIPT upload_drive_files.py VÀO ĐÂY
+# DÁN LIST_FILES TỪ SCRIPT batch_upload_local.py VÀO ĐÂY
 LIST_FILES = ['1I0lmDgGJdHfnzIjdLtH4ayXmb83G5dgR', '1pwCceN2dAucZEWytejVCPi6jX5xYItfY', '1XqETTjqIRJ_rUhI_DP--HaR0w3LODTgq'] 
 # ----------------------------------------------------
 
@@ -15,62 +15,65 @@ MODEL_NAME = "gemini-2.0-flash"
 
 
 @st.cache_resource
-def setup_chat_session():
-    """Khởi tạo Gemini client và chat session bằng API Key."""
+def setup_chat_client():
+    """Khởi tạo Client duy nhất (đã cache)"""
     try:
-        # Lấy API Key từ Secrets
         api_key = st.secrets["GEMINI_API_KEY"]
-        client = genai.Client(api_key=api_key)
-        
-        sys_instruct = (
-            "Bạn là Gia sư Hóa học THCS thông minh. Trả lời theo 2 quy trình: Lý thuyết (Cơ bản/Nâng cao) và Bài tập (Hướng dẫn/Giải chi tiết)."
-        )
-
-        list_parts = []
-        for file_name in LIST_FILES:
-            # Dùng mã file tạm thời của Gemini (được tạo bởi script)
-            uri = f"https://generativelanguage.googleapis.com/v1beta/files/{file_name}" 
-            # Dùng mime_type chung, vì file PDF/TXT đều được xử lý tốt
-            list_parts.append(types.Part.from_uri(file_uri=uri, mime_type="application/pdf")) 
-        
-        list_parts.append(types.Part.from_text(text="Hãy tuân thủ 2 quy trình sư phạm trên."))
-
-        chat = client.chats.create(
-            model=MODEL_NAME, 
-            config=types.GenerateContentConfig(
-                system_instruction=sys_instruct,
-                temperature=0.3
-            ),
-            history=[
-                types.Content(role="user", parts=list_parts),
-                types.Content(role="model", parts=[
-                    types.Part.from_text(text="Đã hiểu 2 quy trình. Tôi đã đọc tài liệu.")
-                ])
-            ]
-        )
-        return chat 
+        return genai.Client(api_key=api_key)
     except Exception as e:
-        st.error(f"❌ Lỗi thiết lập Gemini: {e}")
-        
-        if "API key" in str(e):
-            st.error("Lỗi: Kiểm tra xem GEMINI_API_KEY đã được dán vào Streamlit Secrets chưa.")
-        elif "Invalid or unsupported file uri" in str(e) or "files/" in str(e):
-            st.error("Lỗi: Mã file trong LIST_FILES không hợp lệ hoặc đã hết hạn (48h). Vui lòng chạy lại script upload_drive_files.py.")
-        
+        st.error(f"❌ Lỗi: Không thể khởi tạo Client API. Kiểm tra GEMINI_API_KEY. {e}")
         return None
+
+def get_or_create_chat_session(client):
+    """Tạo hoặc sử dụng lại phiên trò chuyện (Không cache)"""
+    if 'chat_session' not in st.session_state or st.session_state.chat_session is None:
+        try:
+            sys_instruct = (
+                "Bạn là Gia sư Hóa học THCS thông minh. Trả lời theo 2 quy trình: Lý thuyết (Cơ bản/Nâng cao) và Bài tập (Hướng dẫn/Giải chi tiết)."
+            )
+
+            list_parts = []
+            for file_name in LIST_FILES:
+                uri = f"https://generativelanguage.googleapis.com/v1beta/files/{file_name}" 
+                list_parts.append(types.Part.from_uri(file_uri=uri, mime_type="application/pdf")) 
+            
+            list_parts.append(types.Part.from_text(text="Hãy tuân thủ 2 quy trình sư phạm trên."))
+
+            chat = client.chats.create(
+                model=MODEL_NAME, 
+                config=types.GenerateContentConfig(
+                    system_instruction=sys_instruct,
+                    temperature=0.3
+                ),
+                history=[
+                    types.Content(role="user", parts=list_parts),
+                    types.Content(role="model", parts=[
+                        types.Part.from_text(text="Đã hiểu 2 quy trình. Tôi đã đọc tài liệu.")
+                    ])
+                ]
+            )
+            st.session_state.chat_session = chat
+            return chat
+        except Exception as e:
+            st.error(f"❌ Lỗi thiết lập Chat Session: {e}")
+            return None
+    return st.session_state.chat_session
 
 # --- CHẠY ỨNG DỤNG ---
 st.set_page_config(page_title="Gia sư Hóa học (Ổn định)", layout="wide")
-st.title("👨‍🔬 Gia sư Hóa học THCS (Nguồn: Google Drive -> Tái Upload)")
+st.title("👨‍🔬 Gia sư Hóa học THCS (Nguồn: Tải lên Trực tiếp)")
 
-# Khởi tạo chat session
-chat_session = setup_chat_session()
+# Khởi tạo Client và Session
+client = setup_chat_client()
+chat_session = None
 
+if client:
+    chat_session = get_or_create_chat_session(client)
+    
 if chat_session:
     st.sidebar.success("✅ Đã kết nối Gemini (Dữ liệu ổn định).")
     st.sidebar.info(f"🤖 Model: {MODEL_NAME}")
     
-    # Hiển thị thông báo đã tìm thấy file (dựa trên LIST_FILES)
     if len(LIST_FILES) > 0 and LIST_FILES[0] != 'DÁN_MÃ_FILE_TẠM_THỜI_VÀO_ĐÂY':
         st.sidebar.info(f"Thấy {len(LIST_FILES)} tài liệu.")
     st.sidebar.warning("⚠️ Mã file sẽ hết hạn sau 48 giờ. Vui lòng chạy lại script trên máy tính để làm mới dữ liệu.")
@@ -95,9 +98,17 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
         with st.chat_message("assistant"):
             with st.spinner("Thầy đang tra cứu..."):
                 try:
+                    # GỌI SEND_MESSAGE (Đây là đoạn code sẽ gây lỗi nếu client bị đóng)
                     response = chat_session.send_message(prompt)
                     st.markdown(response.text)
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
+                
                 except Exception as e:
-                    st.error(f"Lỗi: {e}")
-
+                    if "Cannot send a request, as the client has been closed." in str(e):
+                        # Lỗi client closed, buộc tạo lại session
+                        st.warning("Kết nối bị ngắt. Đang tự động tạo lại phiên trò chuyện...")
+                        del st.session_state.chat_session # Xóa session cũ
+                        # Sau khi xóa, session sẽ được tạo lại ở lần chạy script tiếp theo
+                        st.rerun() 
+                    else:
+                        st.error(f"Lỗi: {e}")

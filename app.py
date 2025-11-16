@@ -6,7 +6,7 @@ import os
 # ----------------------------------------------------
 # ⚠️ BƯỚC 1: DÁN DANH SÁCH MÃ FILE TẠM THỜI VÀO ĐÂY ⚠️
 # DÁN LIST_FILES TỪ SCRIPT upload_drive_files.py VÀO ĐÂY
-LIST_FILES = ['DÁN_MÃ_FILE_TẠM_THỜI_VÀO_ĐÂY'] 
+LIST_FILES = ['1I0lmDgGJdHfnzIjdLtH4ayXmb83G5dgR', '1pwCceN2dAucZEWytejVCPi6jX5xYItfY', '1XqETTjqIRJ_rUhI_DP--HaR0w3LODTgq'] 
 # ----------------------------------------------------
 
 # --- CẤU HÌNH KHÁC ---
@@ -100,3 +100,4 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
+

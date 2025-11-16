@@ -6,9 +6,9 @@ import io
 
 # --- CẤU HÌNH BẮT BUỘC ---
 # 👇 DÁN ID THƯ MỤC GOOGLE DRIVE CỦA BẠN VÀO ĐÂY
-GOOGLE_DRIVE_FOLDER_ID = "1tSMd0fCm8NOsGfOnK2v0we63Ntp5anpB" 
+GOOGLE_DRIVE_FOLDER_ID = "DÁN_ID_THƯ_MỤC_CỦA_BẠN_VÀO_ĐÂY" 
 
-# 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG (Giữ nguyên gemini-2.0-flash)
+# 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG
 MODEL_NAME = "gemini-2.0-flash"
 # --- KẾT THÚC CẤU HÌNH ---
 
@@ -19,7 +19,6 @@ def get_credentials():
     try:
         from google.oauth2 import service_account
         
-        # 1. LẤY TỪNG MẢNH KHOÁ TỪ SECRETS
         creds_dict = {
             "type": st.secrets["type"],
             "project_id": st.secrets["project_id"],
@@ -34,10 +33,9 @@ def get_credentials():
             "universe_domain": st.secrets["universe_domain"]
         }
         
-        # 2. KHỞI TẠO QUYỀN TRUY CẬP (SCOPES)
         scopes = [
-            'https://www.googleapis.com/auth/drive.readonly', # Cho Drive
-            'https://www.googleapis.com/auth/cloud-platform' # Cho Gemini
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/cloud-platform'
         ]
         creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=scopes)
         return creds
@@ -82,12 +80,12 @@ def get_files_from_drive(_service):
         st.error(f"Lỗi khi lấy danh sách file Drive: {e}")
         return []
 
-# ⚠️ HÀM NÀY LÀ MẢNH GHÉP QUAN TRỌNG NHẤT ⚠️
+# HÀM NÀY PHẢI TRẢ VỀ CẢ CLIENT VÀ CHAT SESSION
 @st.cache_resource
 def setup_chat_session(_creds, _drive_files):
     """Khởi tạo Gemini client bằng credentials của Robot."""
     try:
-        # KHỞI TẠO CLIENT BẰNG CREDENTIALS (SỬ DỤNG IDENTITY CỦA ROBOT)
+        # Client không dùng API Key
         client = genai.Client(credentials=_creds)
         
         sys_instruct = (
@@ -108,8 +106,6 @@ def setup_chat_session(_creds, _drive_files):
 
         list_parts = []
         for f in _drive_files:
-            # 💡 ĐƯỜNG LINK CHUẨN CỦA GOOGLE DRIVE API (VĨNH VIỄN) 💡
-            # Nó không dùng generativelanguage/v1beta/files/... nữa
             uri = f"https://www.googleapis.com/drive/v3/files/{f['id']}?alt=media" 
             list_parts.append(types.Part.from_uri(file_uri=uri, mime_type=f['mimeType'])) 
         
@@ -128,7 +124,8 @@ def setup_chat_session(_creds, _drive_files):
                 ])
             ]
         )
-        return client, chat
+        # TRẢ VỀ CẢ CLIENT VÀ CHAT SESSION
+        return client, chat 
     except Exception as e:
         st.error(f"❌ Lỗi thiết lập Gemini: {e}")
         return None, None
@@ -137,9 +134,10 @@ def setup_chat_session(_creds, _drive_files):
 st.set_page_config(page_title="Gia sư Hóa học (Drive)", layout="wide")
 st.title("👨‍🔬 Gia sư Hóa học THCS (Nguồn: Google Drive)")
 
-# ⚠️ LOGIC CHÍNH ĐÃ THAY ĐỔI ⚠️
+# ⚠️ KHỞI TẠO BIẾN TRƯỚC ⚠️
 credentials = get_credentials()
-chat_session = None
+client = None # Cần khởi tạo client
+chat_session = None # Khởi tạo chat_session
 
 if credentials:
     drive_service = get_google_drive_service(credentials)
@@ -151,7 +149,12 @@ if credentials:
                 with st.expander(f"Thấy {len(drive_files)} tài liệu (Refresh sau 10p)"):
                     for f in drive_files:
                         st.code(f"{f['name']} ({f['mimeType']})")
-            chat_session = setup_chat_session(credentials, drive_files)
+            
+            # ⚠️ SỬA LỖI: BÓC TÁCH TUPLE CHÍNH XÁC ⚠️
+            result = setup_chat_session(credentials, drive_files)
+            if result and isinstance(result, tuple):
+                client, chat_session = result # Lấy client và chat_session ra từ tuple
+
         else:
             st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")
     else:
@@ -167,6 +170,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 if prompt := st.chat_input("Nhập câu hỏi..."):
+    # Kiểm tra chat_session
     if not chat_session:
         st.error("Lỗi: Chatbot chưa được khởi tạo. Kiểm tra cấu hình.")
     else:
@@ -176,6 +180,7 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
         with st.chat_message("assistant"):
             with st.spinner("Thầy đang tra cứu Google Drive..."):
                 try:
+                    # GỌI HÀM SEND_MESSAGE TRÊN CHAT_SESSION ĐÚNG ĐẮN
                     response = chat_session.send_message(prompt)
                     st.markdown(response.text)
                     st.session_state.messages.append({"role": "assistant", "content": response.text})

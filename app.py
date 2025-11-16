@@ -6,7 +6,7 @@ import io
 
 # --- CẤU HÌNH BẮT BUỘC ---
 # 👇 DÁN ID THƯ MỤC GOOGLE DRIVE CỦA BẠN VÀO ĐÂY
-GOOGLE_DRIVE_FOLDER_ID = "DÁN_ID_THƯ_MỤC_CỦA_BẠN_VÀO_ĐÂY" 
+GOOGLE_DRIVE_FOLDER_ID = "1tSMd0fCm8NOsGfOnK2v0we63Ntp5anpB" 
 
 # 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG
 MODEL_NAME = "gemini-2.0-flash"
@@ -186,3 +186,4 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
+

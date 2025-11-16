@@ -14,12 +14,10 @@ MODEL_NAME = "gemini-2.0-flash"
 
 
 @st.cache_resource
-def get_google_drive_service():
-    """Xác thực Drive bằng cách đọc từng mảnh Secrets."""
+def get_credentials():
+    """Lấy credentials của Robot từ Streamlit Secrets."""
     try:
         from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-
         creds_dict = {
             "type": st.secrets["type"],
             "project_id": st.secrets["project_id"],
@@ -33,22 +31,36 @@ def get_google_drive_service():
             "client_x509_cert_url": st.secrets["client_x509_cert_url"],
             "universe_domain": st.secrets["universe_domain"]
         }
-        
-        creds = service_account.Credentials.from_service_account_info(creds_dict)
-        service = build('drive', 'v3', credentials=creds)
-        st.sidebar.success("✅ Đã kết nối Google Drive!")
-        return service
+        # Thêm scope (quyền) cho cả Drive và Gemini (Vertex AI)
+        scopes = [
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/cloud-platform' # Quyền cho Vertex AI
+        ]
+        creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        return creds
         
     except KeyError as e:
         st.error(f"Lỗi Secrets: Thiếu key '{e.args[0]}'. Hãy kiểm tra file Secrets.")
         return None
     except Exception as e:
-        st.error(f"Lỗi xác thực Google Drive: {e}")
+        st.error(f"Lỗi tạo Credentials: {e}")
         return None
 
-@st.cache_data(ttl=600) # Cache trong 10 phút
+@st.cache_resource
+def get_google_drive_service(_creds):
+    """Khởi tạo Google Drive service."""
+    try:
+        from googleapiclient.discovery import build
+        service = build('drive', 'v3', credentials=_creds)
+        st.sidebar.success("✅ Đã kết nối Google Drive!")
+        return service
+    except Exception as e:
+        st.error(f"Lỗi kết nối Drive: {e}")
+        return None
+
+@st.cache_data(ttl=600)
 def get_files_from_drive(_service):
-    """Lấy danh sách file ID VÀ mimeType từ thư mục Google Drive."""
+    """Lấy danh sách file ID và mimeType từ thư mục Google Drive."""
     try:
         query = f"'{GOOGLE_DRIVE_FOLDER_ID}' in parents"
         results = _service.files().list(q=query, fields="files(id, name, mimeType)").execute()
@@ -67,12 +79,13 @@ def get_files_from_drive(_service):
         st.error(f"Lỗi khi lấy danh sách file Drive: {e}")
         return []
 
+# ⚠️ HÀM NÀY ĐÃ ĐƯỢC VIẾT LẠI ⚠️
 @st.cache_resource
-def setup_chat_session(_drive_files):
-    """Khởi tạo Gemini client và phiên chat với các file từ Drive."""
+def setup_chat_session(_creds, _drive_files):
+    """Khởi tạo Gemini client bằng credentials của Robot."""
     try:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        client = genai.Client(api_key=api_key)
+        # 1. KHỞI TẠO CLIENT BẰNG CREDENTIALS (KHÔNG DÙNG API KEY)
+        client = genai.Client(credentials=_creds)
         
         sys_instruct = (
             "Bạn là Gia sư Hóa học THCS thông minh. Bạn có 2 quy trình chính:\n\n"
@@ -92,8 +105,8 @@ def setup_chat_session(_drive_files):
 
         list_parts = []
         for f in _drive_files:
-            # ⚠️ SỬA LỖI TAI HẠI: "generativelace" -> "generativelanguage" ⚠️
-            uri = f"https://generativelanguage.googleapis.com/v1beta/files/{f['id']}"
+            # 2. DÙNG URI CHUẨN CỦA GOOGLE API
+            uri = f"https://www.googleapis.com/drive/v3/files/{f['id']}?alt=media"
             list_parts.append(types.Part.from_uri(file_uri=uri, mime_type=f['mimeType'])) 
         
         list_parts.append(types.Part.from_text(text="Hãy tuân thủ 2 quy trình sư phạm trên."))
@@ -120,22 +133,28 @@ def setup_chat_session(_drive_files):
 st.set_page_config(page_title="Gia sư Hóa học (Drive)", layout="wide")
 st.title("👨‍🔬 Gia sư Hóa học THCS (Nguồn: Google Drive)")
 
-drive_service = get_google_drive_service()
+# ⚠️ LOGIC CHÍNH ĐÃ THAY ĐỔI ⚠️
+credentials = get_credentials()
+chat_session = None # Khởi tạo là None
 
-if drive_service:
-    drive_files = get_files_from_drive(drive_service)
-    
-    if drive_files:
-        with st.sidebar:
-            st.info(f"🤖 Model: {MODEL_NAME}")
-            with st.expander(f"Thấy {len(drive_files)} tài liệu (Refresh sau 10p)"):
-                for f in drive_files:
-                    st.code(f"{f['name']} ({f['mimeType']})")
-        client, chat_session = setup_chat_session(drive_files)
+if credentials:
+    drive_service = get_google_drive_service(credentials)
+    if drive_service:
+        drive_files = get_files_from_drive(drive_service)
+        if drive_files:
+            with st.sidebar:
+                st.info(f"🤖 Model: {MODEL_NAME}")
+                with st.expander(f"Thấy {len(drive_files)} tài liệu (Refresh sau 10p)"):
+                    for f in drive_files:
+                        st.code(f"{f['name']} ({f['mimeType']})")
+            # Khởi tạo chat session
+            chat_session = setup_chat_session(credentials, drive_files)
+        else:
+            st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")
     else:
-        st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")
+        st.sidebar.error("Chưa kết nối được Google Drive.")
 else:
-    st.sidebar.error("Chưa kết nối được Google Drive. Kiểm tra Secrets.")
+    st.sidebar.error("Chưa lấy được Credentials. Kiểm tra Secrets.")
 
 # Giao diện Chat
 if "messages" not in st.session_state:
@@ -145,7 +164,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 if prompt := st.chat_input("Nhập câu hỏi..."):
-    if 'chat_session' not in locals() or not chat_session:
+    if not chat_session:
         st.error("Lỗi: Chatbot chưa được khởi tạo. Kiểm tra cấu hình.")
     else:
         st.session_state.messages.append({"role": "user", "content": prompt})

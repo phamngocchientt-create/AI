@@ -4,11 +4,11 @@ from google.genai import types
 import os
 import io
 
-# --- CẤU HÌNH BẮT BUỘC (SỬA LẠI CHO ĐÚNG) ---
+# --- CẤU HÌNH BẮT BUỘC ---
 # 👇 DÁN ID THƯ MỤC GOOGLE DRIVE CỦA BẠN VÀO ĐÂY
 GOOGLE_DRIVE_FOLDER_ID = "1tSMd0fCm8NOsGfOnK2v0we63Ntp5anpB" 
 
-# 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG
+# 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG (Giữ nguyên gemini-2.0-flash)
 MODEL_NAME = "gemini-2.0-flash"
 # --- KẾT THÚC CẤU HÌNH ---
 
@@ -18,6 +18,8 @@ def get_credentials():
     """Lấy credentials của Robot từ Streamlit Secrets."""
     try:
         from google.oauth2 import service_account
+        
+        # 1. LẤY TỪNG MẢNH KHOÁ TỪ SECRETS
         creds_dict = {
             "type": st.secrets["type"],
             "project_id": st.secrets["project_id"],
@@ -31,10 +33,11 @@ def get_credentials():
             "client_x509_cert_url": st.secrets["client_x509_cert_url"],
             "universe_domain": st.secrets["universe_domain"]
         }
-        # Thêm scope (quyền) cho cả Drive và Gemini (Vertex AI)
+        
+        # 2. KHỞI TẠO QUYỀN TRUY CẬP (SCOPES)
         scopes = [
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/cloud-platform' # Quyền cho Vertex AI
+            'https://www.googleapis.com/auth/drive.readonly', # Cho Drive
+            'https://www.googleapis.com/auth/cloud-platform' # Cho Gemini
         ]
         creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=scopes)
         return creds
@@ -79,12 +82,12 @@ def get_files_from_drive(_service):
         st.error(f"Lỗi khi lấy danh sách file Drive: {e}")
         return []
 
-# ⚠️ HÀM NÀY ĐÃ ĐƯỢC VIẾT LẠI ⚠️
+# ⚠️ HÀM NÀY LÀ MẢNH GHÉP QUAN TRỌNG NHẤT ⚠️
 @st.cache_resource
 def setup_chat_session(_creds, _drive_files):
     """Khởi tạo Gemini client bằng credentials của Robot."""
     try:
-        # 1. KHỞI TẠO CLIENT BẰNG CREDENTIALS (KHÔNG DÙNG API KEY)
+        # KHỞI TẠO CLIENT BẰNG CREDENTIALS (SỬ DỤNG IDENTITY CỦA ROBOT)
         client = genai.Client(credentials=_creds)
         
         sys_instruct = (
@@ -105,8 +108,9 @@ def setup_chat_session(_creds, _drive_files):
 
         list_parts = []
         for f in _drive_files:
-            # 2. DÙNG URI CHUẨN CỦA GOOGLE API
-            uri = f"https://www.googleapis.com/drive/v3/files/{f['id']}?alt=media"
+            # 💡 ĐƯỜNG LINK CHUẨN CỦA GOOGLE DRIVE API (VĨNH VIỄN) 💡
+            # Nó không dùng generativelanguage/v1beta/files/... nữa
+            uri = f"https://www.googleapis.com/drive/v3/files/{f['id']}?alt=media" 
             list_parts.append(types.Part.from_uri(file_uri=uri, mime_type=f['mimeType'])) 
         
         list_parts.append(types.Part.from_text(text="Hãy tuân thủ 2 quy trình sư phạm trên."))
@@ -135,7 +139,7 @@ st.title("👨‍🔬 Gia sư Hóa học THCS (Nguồn: Google Drive)")
 
 # ⚠️ LOGIC CHÍNH ĐÃ THAY ĐỔI ⚠️
 credentials = get_credentials()
-chat_session = None # Khởi tạo là None
+chat_session = None
 
 if credentials:
     drive_service = get_google_drive_service(credentials)
@@ -147,7 +151,6 @@ if credentials:
                 with st.expander(f"Thấy {len(drive_files)} tài liệu (Refresh sau 10p)"):
                     for f in drive_files:
                         st.code(f"{f['name']} ({f['mimeType']})")
-            # Khởi tạo chat session
             chat_session = setup_chat_session(credentials, drive_files)
         else:
             st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")

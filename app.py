@@ -6,14 +6,14 @@ import io
 
 # --- CẤU HÌNH BẮT BUỘC (SỬA LẠI CHO ĐÚNG) ---
 # 👇 DÁN ID THƯ MỤC GOOGLE DRIVE CỦA BẠN VÀO ĐÂY
-GOOGLE_DRIVE_FOLDER_ID = "1tSMd0fCm8NOsGfOnK2v0we63Ntp5anpB" 
+GOOGLE_DRIVE_FOLDER_ID = "DÁN_ID_THƯ_MỤC_CỦA_BẠN_VÀO_ĐÂY" 
 
 # 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG (Lấy từ lần check trước)
 MODEL_NAME = "gemini-2.0-flash"
 # --- KẾT THÚC CẤU HÌNH ---
 
 
-# ⚠️ HÀM NÀY ĐÃ ĐƯỢC VIẾT LẠI HOÀN TOÀN ⚠️
+# ⚠️ HÀM NÀY VIẾT LẠI ĐỂ ĐỌC TỪNG MẢNH SECRETS
 @st.cache_resource
 def get_google_drive_service():
     """Xác thực Drive bằng cách đọc từng mảnh Secrets."""
@@ -28,7 +28,7 @@ def get_google_drive_service():
             "type": st.secrets["type"],
             "project_id": st.secrets["project_id"],
             "private_key_id": st.secrets["private_key_id"],
-            "private_key": st.secrets["private_key"], # Đọc thẳng private_key
+            "private_key": st.secrets["private_key"], 
             "client_email": st.secrets["client_email"],
             "client_id": st.secrets["client_id"],
             "auth_uri": st.secrets["auth_uri"],
@@ -112,7 +112,10 @@ def setup_chat_session(_drive_files):
             ),
             history=[
                 types.Content(role="user", parts=list_parts),
-                types.Content(role="model", parts=[types.Part.from_text("Đã hiểu 2 quy trình. Tôi đã đọc tài liệu từ Google Drive.")])
+                # ⚠️ DÒNG NÀY ĐÃ ĐƯỢC SỬA LỖI (Gộp thành 1 đối số) ⚠️
+                types.Content(role="model", parts=[
+                    types.Part.from_text(text="Đã hiểu 2 quy trình. Tôi đã đọc tài liệu từ Google Drive.")
+                ])
             ]
         )
         return client, chat
@@ -163,4 +166,3 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
-

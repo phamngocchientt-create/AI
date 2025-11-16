@@ -6,24 +6,20 @@ import io
 
 # --- CẤU HÌNH BẮT BUỘC (SỬA LẠI CHO ĐÚNG) ---
 # 👇 DÁN ID THƯ MỤC GOOGLE DRIVE CỦA BẠN VÀO ĐÂY
-GOOGLE_DRIVE_FOLDER_ID = "1tSMd0fCm8NOsGfOnK2v0we63Ntp5anpB" 
+GOOGLE_DRIVE_FOLDER_ID = "DÁN_ID_THƯ_MỤC_CỦA_BẠN_VÀO_ĐÂY" 
 
-# 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG (Lấy từ lần check trước)
+# 👇 ĐIỀN TÊN CHÍNH XÁC CỦA MODEL BẠN DÙNG
 MODEL_NAME = "gemini-2.0-flash"
 # --- KẾT THÚC CẤU HÌNH ---
 
 
-# ⚠️ HÀM NÀY VIẾT LẠI ĐỂ ĐỌC TỪNG MẢNH SECRETS
 @st.cache_resource
 def get_google_drive_service():
     """Xác thực Drive bằng cách đọc từng mảnh Secrets."""
     try:
-        # Nhập thư viện
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
-        # 1. Tự xây dựng lại dictionary từ Secrets
-        # Cách này tránh được lỗi "Invalid control character"
         creds_dict = {
             "type": st.secrets["type"],
             "project_id": st.secrets["project_id"],
@@ -38,7 +34,6 @@ def get_google_drive_service():
             "universe_domain": st.secrets["universe_domain"]
         }
         
-        # 2. Tạo credentials từ dictionary
         creds = service_account.Credentials.from_service_account_info(creds_dict)
         service = build('drive', 'v3', credentials=creds)
         st.sidebar.success("✅ Đã kết nối Google Drive!")
@@ -51,11 +46,10 @@ def get_google_drive_service():
         st.error(f"Lỗi xác thực Google Drive: {e}")
         return None
 
-# --- CÁC HÀM CÒN LẠI GIỮ NGUYÊN ---
-
+# ⚠️ HÀM NÀY ĐÃ ĐƯỢC SỬA ⚠️
 @st.cache_data(ttl=600) # Cache trong 10 phút
 def get_files_from_drive(_service):
-    """Lấy danh sách file ID từ thư mục Google Drive."""
+    """Lấy danh sách file ID VÀ mimeType từ thư mục Google Drive."""
     try:
         query = f"'{GOOGLE_DRIVE_FOLDER_ID}' in parents"
         results = _service.files().list(q=query, fields="files(id, name, mimeType)").execute()
@@ -67,13 +61,16 @@ def get_files_from_drive(_service):
             
         file_list = []
         for f in files:
+            # Chỉ lấy các file mà Gemini hỗ trợ đọc
             if "pdf" in f["mimeType"] or "text" in f["mimeType"]:
-                file_list.append({"id": f["id"], "name": f["name"]})
+                # LƯU LẠI CẢ mimeType
+                file_list.append({"id": f["id"], "name": f["name"], "mimeType": f["mimeType"]})
         return file_list
     except Exception as e:
         st.error(f"Lỗi khi lấy danh sách file Drive: {e}")
         return []
 
+# ⚠️ HÀM NÀY ĐÃ ĐƯỢC SỬA ⚠️
 @st.cache_resource
 def setup_chat_session(_drive_files):
     """Khởi tạo Gemini client và phiên chat với các file từ Drive."""
@@ -100,7 +97,8 @@ def setup_chat_session(_drive_files):
         list_parts = []
         for f in _drive_files:
             uri = f"https://generativelace.googleapis.com/v1beta/files/{f['id']}"
-            list_parts.append(types.Part.from_uri(file_uri=uri, mime_type="application/pdf")) 
+            # SỬA LỖI: Dùng đúng mimeType (ví dụ: 'text/plain')
+            list_parts.append(types.Part.from_uri(file_uri=uri, mime_type=f['mimeType'])) 
         
         list_parts.append(types.Part.from_text(text="Hãy tuân thủ 2 quy trình sư phạm trên."))
 
@@ -112,7 +110,6 @@ def setup_chat_session(_drive_files):
             ),
             history=[
                 types.Content(role="user", parts=list_parts),
-                # ⚠️ DÒNG NÀY ĐÃ ĐƯỢC SỬA LỖI (Gộp thành 1 đối số) ⚠️
                 types.Content(role="model", parts=[
                     types.Part.from_text(text="Đã hiểu 2 quy trình. Tôi đã đọc tài liệu từ Google Drive.")
                 ])
@@ -137,7 +134,7 @@ if drive_service:
             st.info(f"🤖 Model: {MODEL_NAME}")
             with st.expander(f"Thấy {len(drive_files)} tài liệu (Refresh sau 10p)"):
                 for f in drive_files:
-                    st.code(f["name"])
+                    st.code(f"{f['name']} ({f['mimeType']})") # Hiển thị cả loại file
         client, chat_session = setup_chat_session(drive_files)
     else:
         st.sidebar.error("Không tìm thấy file PDF/TXT nào trong thư mục Drive.")
@@ -166,4 +163,3 @@ if prompt := st.chat_input("Nhập câu hỏi..."):
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
-
